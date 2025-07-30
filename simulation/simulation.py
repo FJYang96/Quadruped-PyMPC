@@ -32,7 +32,7 @@ def run_simulation(
     friction_coeff=(0.5, 1.0),
     base_vel_command_type="human",
     seed=0,
-    render=True,
+    render='rgb_array',
     recording_path: PathLike = None,
 ):
     np.set_printoptions(precision=3, suppress=True)
@@ -67,8 +67,13 @@ def run_simulation(
         env.mjModel.qpos0 = np.concatenate((env.mjModel.qpos0[:7], qpympc_cfg.qpos0_js))
 
     env.reset(random=False)
-    if render:
+    images = None
+    if render == 'rgb_array':
+        images = [env.render(mode='rgb_array')]
+    elif render == 'human':
         env.render()  # Pass in the first render call any mujoco.viewer.KeyCallbackType
+    else:
+        pass
 
     # Initialization of variables used in the main control loop --------------------------------
 
@@ -256,58 +261,61 @@ def run_simulation(
             ep_ctrl_state_history.append(ctrl_state)
 
             # Render only at a certain frequency -----------------------------------------------------------------
-            if render and (time.time() - last_render_time > 1.0 / RENDER_FREQ or env.step_num == 1):
-                _, _, feet_GRF = env.feet_contact_state(ground_reaction_forces=True)
+            if (time.time() - last_render_time > 1.0 / RENDER_FREQ or env.step_num == 1):
+                if render == 'rgb_array':
+                    images.append(env.render(mode='rgb_array'))
+                elif render == 'human':
+                    _, _, feet_GRF = env.feet_contact_state(ground_reaction_forces=True)
 
-                # Plot the swing trajectory
-                feet_traj_geom_ids = plot_swing_mujoco(
-                    viewer=env.viewer,
-                    swing_traj_controller=quadrupedpympc_wrapper.wb_interface.stc,
-                    swing_period=quadrupedpympc_wrapper.wb_interface.stc.swing_period,
-                    swing_time=LegsAttr(
-                        FL=ctrl_state["swing_time"][0],
-                        FR=ctrl_state["swing_time"][1],
-                        RL=ctrl_state["swing_time"][2],
-                        RR=ctrl_state["swing_time"][3],
-                    ),
-                    lift_off_positions=ctrl_state["lift_off_positions"],
-                    nmpc_footholds=ctrl_state["nmpc_footholds"],
-                    ref_feet_pos=ctrl_state["ref_feet_pos"],
-                    early_stance_detector=quadrupedpympc_wrapper.wb_interface.esd,
-                    geom_ids=feet_traj_geom_ids,
-                )
-
-                # Update and Plot the heightmap
-                if qpympc_cfg.simulation_params["visual_foothold_adaptation"] != "blind":
-                    # if(stc.check_apex_condition(current_contact, interval=0.01)):
-                    for leg_id, leg_name in enumerate(legs_order):
-                        data = heightmaps[
-                            leg_name
-                        ].data  # .update_height_map(ref_feet_pos[leg_name], yaw=env.base_ori_euler_xyz[2])
-                        if data is not None:
-                            for i in range(data.shape[0]):
-                                for j in range(data.shape[1]):
-                                    heightmaps[leg_name].geom_ids[i, j] = render_sphere(
-                                        viewer=env.viewer,
-                                        position=([data[i][j][0][0], data[i][j][0][1], data[i][j][0][2]]),
-                                        diameter=0.01,
-                                        color=[0, 1, 0, 0.5],
-                                        geom_id=heightmaps[leg_name].geom_ids[i, j],
-                                    )
-
-                # Plot the GRF
-                for leg_id, leg_name in enumerate(legs_order):
-                    feet_GRF_geom_ids[leg_name] = render_vector(
-                        env.viewer,
-                        vector=feet_GRF[leg_name],
-                        pos=feet_pos[leg_name],
-                        scale=np.linalg.norm(feet_GRF[leg_name]) * 0.005,
-                        color=np.array([0, 1, 0, 0.5]),
-                        geom_id=feet_GRF_geom_ids[leg_name],
+                    # Plot the swing trajectory
+                    feet_traj_geom_ids = plot_swing_mujoco(
+                        viewer=env.viewer,
+                        swing_traj_controller=quadrupedpympc_wrapper.wb_interface.stc,
+                        swing_period=quadrupedpympc_wrapper.wb_interface.stc.swing_period,
+                        swing_time=LegsAttr(
+                            FL=ctrl_state["swing_time"][0],
+                            FR=ctrl_state["swing_time"][1],
+                            RL=ctrl_state["swing_time"][2],
+                            RR=ctrl_state["swing_time"][3],
+                        ),
+                        lift_off_positions=ctrl_state["lift_off_positions"],
+                        nmpc_footholds=ctrl_state["nmpc_footholds"],
+                        ref_feet_pos=ctrl_state["ref_feet_pos"],
+                        early_stance_detector=quadrupedpympc_wrapper.wb_interface.esd,
+                        geom_ids=feet_traj_geom_ids,
                     )
 
-                env.render()
-                last_render_time = time.time()
+                    # Update and Plot the heightmap
+                    if qpympc_cfg.simulation_params["visual_foothold_adaptation"] != "blind":
+                        # if(stc.check_apex_condition(current_contact, interval=0.01)):
+                        for leg_id, leg_name in enumerate(legs_order):
+                            data = heightmaps[
+                                leg_name
+                            ].data  # .update_height_map(ref_feet_pos[leg_name], yaw=env.base_ori_euler_xyz[2])
+                            if data is not None:
+                                for i in range(data.shape[0]):
+                                    for j in range(data.shape[1]):
+                                        heightmaps[leg_name].geom_ids[i, j] = render_sphere(
+                                            viewer=env.viewer,
+                                            position=([data[i][j][0][0], data[i][j][0][1], data[i][j][0][2]]),
+                                            diameter=0.01,
+                                            color=[0, 1, 0, 0.5],
+                                            geom_id=heightmaps[leg_name].geom_ids[i, j],
+                                        )
+
+                    # Plot the GRF
+                    for leg_id, leg_name in enumerate(legs_order):
+                        feet_GRF_geom_ids[leg_name] = render_vector(
+                            env.viewer,
+                            vector=feet_GRF[leg_name],
+                            pos=feet_pos[leg_name],
+                            scale=np.linalg.norm(feet_GRF[leg_name]) * 0.005,
+                            color=np.array([0, 1, 0, 0.5]),
+                            geom_id=feet_GRF_geom_ids[leg_name],
+                        )
+
+                    env.render(mode='human')
+                    last_render_time = time.time()
 
             # Reset the environment if the episode is terminated ------------------------------------------------
             if env.step_num >= N_STEPS_PER_EPISODE or is_terminated or is_truncated:
@@ -326,6 +334,8 @@ def run_simulation(
             h5py_writer.append_trajectory(state_obs_traj=ep_obs_history, time=ep_traj_time)
 
     env.close()
+    if render == 'rgb_array':
+        return images, RENDER_FREQ
     if h5py_writer is not None:
         return h5py_writer.file_path
 
@@ -354,6 +364,10 @@ if __name__ == "__main__":
     pass
 
     # Run the simulation with the desired configuration.....
-    run_simulation(qpympc_cfg=qpympc_cfg)
-
+    images, RENDER_FREQ = run_simulation(
+        qpympc_cfg=qpympc_cfg, num_episodes=1, num_seconds_per_episode=10, render='rgb_array'
+    )
+    import imageio
+    imageio.mimsave('images.mp4', images, fps=RENDER_FREQ)
+    print(f"Saved video to images.mp4 with {RENDER_FREQ} fps")
     # run_simulation(num_episodes=1, render=False)
