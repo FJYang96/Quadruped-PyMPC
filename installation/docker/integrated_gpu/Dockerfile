@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y gedit
 
 # Install git
 RUN apt-get update && apt-get install -y git
+RUN apt install -y libosmesa6 libosmesa6-dev
 
 
 # Install Miniforge
@@ -30,8 +31,9 @@ RUN apt-get update && \
 
 RUN git clone https://github.com/iit-DLSLab/Quadruped-PyMPC.git
 RUN cd Quadruped-PyMPC && git submodule update --init --recursive
+RUN cd Quadruped-PyMPC && sed -i 's|git+https://github.com/iit-DLSLab/gym-quadruped.git|git+https://github.com/FJYang96/gym-quadruped.git|' pyproject.toml
 # Create a conda environment with the specified name
-RUN cd Quadruped-PyMPC/installation/mamba/integrated_gpu/ && conda env create -f mamba_environment_ros2.yml
+RUN cd Quadruped-PyMPC/installation/mamba/integrated_gpu/ && conda env create -f mamba_environment_ros2_jazzy.yml
 
 SHELL ["conda", "run", "-n", "quadruped_pympc_ros2_env", "/bin/bash", "-c"]
 
@@ -53,3 +55,5 @@ RUN echo 'conda activate quadruped_pympc_ros2_env' >> /root/.bashrc
 # Set the working directory and source the bashrc file
 WORKDIR /home
 RUN source /root/.bashrc
+ENV MUJOCO_GL=osmesa
+RUN pip install imageio[ffmpeg]
