@@ -364,10 +364,11 @@ if __name__ == "__main__":
     pass
 
     # Run the simulation with the desired configuration.....
+    episode_length = 0.5
     images, RENDER_FREQ = run_simulation(
-        qpympc_cfg=qpympc_cfg, num_episodes=1, num_seconds_per_episode=10, render='rgb_array'
+        qpympc_cfg=qpympc_cfg, num_episodes=1, num_seconds_per_episode=episode_length, render='rgb_array'
     )
     import imageio
-    imageio.mimsave('images.mp4', images, fps=RENDER_FREQ)
-    print(f"Saved video to images.mp4 with {RENDER_FREQ} fps")
+    imageio.mimsave('images.mp4', images, fps=len(images)/episode_length)
+    print(f"Saved video to images.mp4 with {len(images)/episode_length} fps")
     # run_simulation(num_episodes=1, render=False)
